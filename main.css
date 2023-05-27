@@ -1,0 +1,49 @@
+:root {
+    font: 10px/1 Monaco, monospace;
+    color-scheme: dark;
+    --bc: #7c2d6b;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    background: #26132e;
+}
+
+.maze {
+    display: inline-grid;
+    margin: 2rem;
+    user-select: none;
+    color: #24584a;
+}
+
+.cell {
+    display: flex;
+    overflow: hidden;
+    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3px;
+    text-align: center;
+    border: 2px solid transparent;
+    aspect-ratio: 1;
+    gap: 6px;
+}
+
+.cell > div:first-child {color: gray}
+.cell b:first-child {color: red}
+.cell b:last-child {color: green}
+
+
+.cell:nth-child(odd) {background: #1a1a1a}
+.cell:nth-child(even) {background: #000}
+
+.cell.wt {border-top-color: var(--bc)}
+.cell.wr {border-right-color: var(--bc)}
+.cell.wb {border-bottom-color: var(--bc)}
+.cell.wl {border-left-color: var(--bc)}
+.cell.unvisited {background-color: #1f0458}
+.cell.random {background-color: #005751}
+.cell.active {background-color: #ffffff}
