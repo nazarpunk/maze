@@ -66,8 +66,8 @@ export const MazeGenerate = async (name, width, height) => {
     await Promise.all(p);
     await delay(200);
 
-    const x = GetRandomInt(0, width);
-    const y = GetRandomInt(0, height);
+    const x = GetRandomInt(0, width - 1);
+    const y = GetRandomInt(0, height - 1);
     let i = MazeCellIndex(name, x, y);
     domlist[i].classList.remove('unvisited', 'wt', 'wr', 'wb', 'wl');
     domlist[i].classList.add('active');

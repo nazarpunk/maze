@@ -1,5 +1,7 @@
 # wc3-maze
 
+[Demo](https://nazarpunk.github.io/wc3-maze)
+
 https://xgm.guru/p/wc3/dungeongenerator
 
 Генерация ячеек:
