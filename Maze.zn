@@ -1,0 +1,41 @@
+library Maze {
+    hashtable ht = InitHashtable();
+    constant integer htOffset = 100;
+
+    constant integer cellCountKey = 0;
+    constant integer widthKey = 1;
+    constant integer heightKey = 2;
+
+    constant integer wallKeyL = BitwiseShiftLeft(1, 0);
+    constant integer wallKeyT = BitwiseShiftLeft(1, 1);
+    constant integer wallKeyR = BitwiseShiftLeft(1, 2);
+    constant integer wallKeyB = BitwiseShiftLeft(1, 3);
+
+    integer randomCellList[];
+
+    public function MazeWidth(integer maze) -> integer {
+        return LoadInteger(ht, maze, widthKey);
+    }
+    
+    public function MazeHeight = (integer maze) -> integer {
+        return LoadInteger(ht, maze, heightKey);
+    }
+    
+    public function MazeCellIndex = (integer maze, integer x, integer y) -> integer {
+        return x + MazeWidth(maze) * y;
+    }
+
+    public function MazeCellIndexX = (integer maze, integer index) -> integer {
+        return ModuloInteger(index, MazeWidth(maze));
+    }
+
+    public function MazeCellIndexY = (integer maze, integer index) -> integer {
+        return R2I(index / MazeWidth(maze));
+    }
+
+    public function MazeCellCount = (integer maze) -> integer {
+        return LoadInteger(ht, maze, cellCountKey);
+    }
+
+
+}

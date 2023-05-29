@@ -1,17 +1,36 @@
 /**
  * native GetRandomInt takes integer lowBound, integer highBound returns integer
- * @param {number} lowBound
- * @param {number} highBound
- * @return {number}
+ * @param {BigInt} lowBound
+ * @param {BigInt} highBound
+ * @return {BigInt}
  */
 export const GetRandomInt = (lowBound, highBound) => {
-    lowBound = Math.ceil(lowBound);
-    highBound = Math.floor(highBound);
-    return Math.floor(Math.random() * (highBound - lowBound + 1) + lowBound)
+    const min = Number(lowBound);
+    const max = Number(highBound);
+    return BigInt(Math.floor(Math.random() * (max - min + 1) + min))
 }
 
+/**
+ * native BitwiseShiftLeft takes integer bit, integer bitsToShift returns integer
+ * @param {BigInt} bit
+ * @param {BigInt} bitsToShift
+ * @return {BigInt}
+ */
+export const BitwiseShiftLeft = (bit, bitsToShift) => bit << bitsToShift;
+
+/**
+ * native BitwiseAND takes integer bit1, integer bit2 returns integer
+ * @param {BigInt} bit1
+ * @param {BigInt} bit2
+ * @return {BigInt}
+ */
+export const BitwiseAND = (bit1, bit2) => bit1 & bit2
+
+//
+//     native BitwiseOR takes integer bit1, integer bit2 returns integer
+
 class HashTable {
-    /** @type {Map<number, Map<number, number>>} */ int = new Map();
+    /** @type {Map<BigInt, Map<BigInt, BigInt>>} */ int = new Map();
 }
 
 /**
@@ -25,10 +44,9 @@ export const InitHashtable = () => {
 /**
  * native SaveInteger takes hashtable table, integer parentKey, integer childKey, integer value returns nothing
  * @param {HashTable} table
- * @param {number} parentKey
- * @param {number} childKey
- * @param {number} integer
- * @constructor
+ * @param {BigInt} parentKey
+ * @param {BigInt} childKey
+ * @param {BigInt} integer
  */
 export const SaveInteger = (table, parentKey, childKey, integer) => {
     const map = table.int;
@@ -39,25 +57,12 @@ export const SaveInteger = (table, parentKey, childKey, integer) => {
 /**
  * native LoadInteger takes hashtable table, integer parentKey, integer childKey returns integer
  * @param {HashTable} table
- * @param {number} parentKey
- * @param {number} childKey
- * @return {number}
+ * @param {BigInt} parentKey
+ * @param {BigInt} childKey
+ * @return {BigInt}
  */
 export const LoadInteger = (table, parentKey, childKey) => {
     const map = table.int;
-    if (!map.has(parentKey)) return 0;
+    if (!map.has(parentKey)) return 0n;
     return map.get(parentKey).get(childKey);
-}
-
-/**
- * native HaveSavedInteger takes hashtable table, integer parentKey, integer childKey returns boolean
- * @param {HashTable} table
- * @param {number} parentKey
- * @param {number} childKey
- * @return {boolean}
- */
-export const HaveSavedInteger = (table, parentKey, childKey) => {
-    const map = table.int;
-    if (!map.has(parentKey)) return false;
-    return map.get(parentKey).has(childKey);
 }

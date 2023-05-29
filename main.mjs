@@ -1,7 +1,5 @@
-import {MazeGenerate} from "./maze/maze.mjs";
-
-const name = 11;
+import {MazeGenerate} from "./maze.mjs";
 
 export const domlist = [];
 
-await MazeGenerate(name, 20, 20);
+await MazeGenerate(11n, 20n, 20n);
