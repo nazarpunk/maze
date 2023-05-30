@@ -20,17 +20,40 @@ body {
 }
 
 .cell {
-    display: flex;
-    overflow: hidden;
-    align-items: center;
-    flex-direction: column;
-    justify-content: center;
-    padding: 3px;
-    text-align: center;
+    position: relative;
+    box-sizing: border-box;
     border: 2px solid transparent;
     background: #1a1a1a;
-    aspect-ratio: 1;
     gap: 6px;
+}
+
+.inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+
+    justify-content: space-around;
+    padding: 3px;
+    text-align: center;
+    aspect-ratio: 1;
+}
+
+.inner > * {
+    pointer-events: none;
+}
+
+.inner > div {
+    position: relative;
+    z-index: 10;
+}
+
+.cell.side .inner::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background-color: #2463797d;
+    inset: 6px;
 }
 
 .cell > div:first-child {color: gray}
