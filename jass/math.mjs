@@ -1,16 +1,4 @@
 /**
- * native GetRandomInt takes integer lowBound, integer highBound returns integer
- * @param {BigInt} lowBound
- * @param {BigInt} highBound
- * @return {BigInt}
- */
-export const GetRandomInt = (lowBound, highBound) => {
-    const min = Number(lowBound);
-    const max = Number(highBound);
-    return BigInt(Math.floor(Math.random() * (max - min + 1) + min))
-}
-
-/**
  * native BitwiseShiftLeft takes integer bit, integer bitsToShift returns integer
  * @param {BigInt} bit
  * @param {BigInt} bitsToShift

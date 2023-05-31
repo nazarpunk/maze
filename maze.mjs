@@ -1,15 +1,15 @@
 // noinspection ES6MissingAwait
 
 import {delay, sleep} from "./utils.mjs";
-import {domlist} from "./main.mjs";
 import {InitHashtable, LoadInteger, SaveInteger} from "./jass/hashtable.mjs";
-import {BitwiseAND, BitwiseShiftLeft, GetRandomInt} from "./jass/math.mjs";
+import {BitwiseAND, BitwiseShiftLeft} from "./jass/math.mjs";
 import {
     HandleListAddHandle,
     HandleListContainsHandle,
     HandleListCreate, HandleListGetCount, HandleListGetHandleByIndex,
     HandleListRemoveHandle
 } from "./jass/handlelist.mjs";
+import {RandomSeed} from "./RandomSeed.mjs";
 
 const htOffset = 100n;
 const ht = InitHashtable();
@@ -25,6 +25,11 @@ const wallKeyL = BitwiseShiftLeft(1n, 0n);
 const wallKeyT = BitwiseShiftLeft(1n, 1n);
 const wallKeyR = BitwiseShiftLeft(1n, 2n);
 const wallKeyB = BitwiseShiftLeft(1n, 3n);
+
+const wrap = document.querySelector('.maze');
+/** @type {HTMLDivElement[]} */ const domlist = [];
+
+/** @type {RandomSeed} */ let random;
 
 /**
  * @param {BigInt} maze
@@ -179,7 +184,7 @@ const randomCell = async (maze, index) => {
     await sleep();
     for (let i = 7n; i <= randomCellList[6]; i++) domlist[randomCellList[i]].classList.remove('random');
 
-    return randomCellList[Number(GetRandomInt(7n, randomCellList[6]))];
+    return randomCellList[Number(random.uniformInt(7n, randomCellList[6]))];
 }
 
 /**
@@ -227,9 +232,15 @@ const jumpCellSetWall = (maze, a, direction, x, y) => {
  * @param {BigInt} maze
  * @param {BigInt} width
  * @param {BigInt} height
+ * @param {BigInt} seed
+ * @param {BigInt} iterations
  * @return {Promise<void>}
  */
-export const MazeGenerate = async (maze, width, height) => {
+export const MazeGenerate = async (maze, width, height, seed, iterations) => {
+    random = new RandomSeed(Number(seed));
+
+    if (iterations <= 0) iterations = width * height;
+
     const cellCount = width * height;
     let breakWall, wallJumped;
 
@@ -239,20 +250,19 @@ export const MazeGenerate = async (maze, width, height) => {
 
     const count = MazeGetCellCount(maze);
 
-    const div = document.createElement('div');
-    div.classList.add('maze');
-    document.body.appendChild(div);
+    wrap.textContent = '';
+    domlist.length = 0;
 
     const px = '40px';
-    div.style.gridTemplateColumns = `repeat(${MazeGetWidth(maze)}, ${px})`;
-    div.style.gridTemplateRows = `repeat(${MazeGetHeight(maze)}, ${px})`;
+    wrap.style.gridTemplateColumns = `repeat(${MazeGetWidth(maze)}, ${px})`;
+    wrap.style.gridTemplateRows = `repeat(${MazeGetHeight(maze)}, ${px})`;
 
     for (let i = 0n; i < count; i++) {
         const cell = document.createElement('div');
         domlist.push(cell);
         cell.classList.add('cell');
         cell.innerHTML = `<div class="inner"><div>${i}</div><div><b>${MazeCellX(maze, i)}</b>:<b>${MazeCellY(maze, i)}</b></div></div>`;
-        div.appendChild(cell);
+        wrap.appendChild(cell);
     }
 
     // add wall
@@ -273,12 +283,11 @@ export const MazeGenerate = async (maze, width, height) => {
 
     await delay(200);
 
-    //for (let j = 0; j < 5; j++) {
-    while (true) {
+    for (let j = 0; j < iterations; j++) {
         breakWall = true;
         if (a < 0) {
-            ax = GetRandomInt(0n, width - 1n);
-            ay = GetRandomInt(0n, height - 1n);
+            ax = random.uniformInt(0n, width - 1n);
+            ay = random.uniformInt(0n, height - 1n);
             a = MazeGetCellByXY(maze, ax, ay);
         } else {
             ax = MazeCellX(maze, a);
@@ -292,10 +301,7 @@ export const MazeGenerate = async (maze, width, height) => {
 
             domlist[a].classList.remove('active');
             let sideListCount = HandleListGetCount(sideList);
-            if (sideListCount === 0) {
-                console.log('end', a);
-                break;
-            }
+            if (sideListCount === 0) break;
 
             for (let i = 0; i < sideListCount; i++) {
                 b = HandleListGetHandleByIndex(sideList, i);
@@ -303,7 +309,7 @@ export const MazeGenerate = async (maze, width, height) => {
             }
             await delay(200);
 
-            a = HandleListGetHandleByIndex(sideList, Number(GetRandomInt(0n, BigInt(sideListCount - 1))));
+            a = HandleListGetHandleByIndex(sideList, Number(random.uniformInt(0n, BigInt(sideListCount - 1))));
             ax = MazeCellX(maze, a);
             ay = MazeCellY(maze, a);
 
@@ -321,7 +327,6 @@ export const MazeGenerate = async (maze, width, height) => {
             if (!wallJumped && ay > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyT, ax, ay - 1n);
             if (!wallJumped && ax < MazeGetWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyR, ax + 1n, ay);
             if (!wallJumped && ay < MazeGetHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyB, ax, ay + 1n);
-
         }
 
         if (breakWall) {
@@ -337,6 +342,7 @@ export const MazeGenerate = async (maze, width, height) => {
             a = b;
         }
         await sleep();
+        domlist[a].classList.remove('active');
     }
 }
 
