@@ -22,6 +22,11 @@ for (let p of new URLSearchParams(location.hash.slice(1))) {
 
 form.addEventListener('submit', async e => {
     e.preventDefault();
+    if (document.activeElement.dataset.seed) {
+        console.log('111');
+        setV('seed', Date.now());
+    }
+
     let w = Math.max(1, getV('width'));
     let h = Math.max(1, getV('height'));
     let s = getV('seed');
