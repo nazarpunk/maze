@@ -285,7 +285,7 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
 
     await delay(200);
 
-    for (let j = 0; j < iterations; j++) {
+    while (true) {
         breakWall = true;
         if (a < 0) {
             ax = random.uniformInt(0n, width - 1n);
@@ -329,11 +329,13 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
             if (!wallJumped && ay > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyT, ax, ay - 1n);
             if (!wallJumped && ax < MazeGetWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyR, ax + 1n, ay);
             if (!wallJumped && ay < MazeGetHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyB, ax, ay + 1n);
+            iterations--;
         }
 
         if (breakWall) {
             bx = MazeCellX(maze, b);
             by = MazeCellY(maze, b);
+            if (MazeCellWallCount(maze, b) === 4) iterations--;
 
             if (ax > bx && ay === by) cellMergeWall(maze, a, wallKeyL, b);
             if (ax === bx && ay > by) cellMergeWall(maze, a, wallKeyT, b);
@@ -343,8 +345,10 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
             domlist[a].classList.remove('active');
             a = b;
         }
+
         await sleep();
         domlist[a].classList.remove('active');
+        if (iterations === 1n) break;
     }
 }
 

@@ -22,10 +22,16 @@ fieldset {
 label {
     display: flex;
     flex-direction: column;
+    user-select: none;
 }
 
 button[type=submit] {
     cursor: pointer;
+}
+
+.skip {
+    flex-direction: row-reverse;
+    gap: 0.2rem;
 }
 
 .content {
