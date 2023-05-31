@@ -4,7 +4,7 @@ import {delay, sleep} from "./utils.mjs";
 import {InitHashtable, LoadInteger, SaveInteger} from "./jass/hashtable.mjs";
 import {BitwiseAND, BitwiseShiftLeft} from "./jass/math.mjs";
 import {
-    HandleListAddHandle,
+    HandleListAddHandle, HandleListClear,
     HandleListContainsHandle,
     HandleListCreate, HandleListGetCount, HandleListGetHandleByIndex,
     HandleListRemoveHandle
@@ -249,6 +249,8 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
     SaveInteger(ht, maze, heightKey, height);
 
     const count = MazeGetCellCount(maze);
+
+    HandleListClear(sideList);
 
     wrap.textContent = '';
     domlist.length = 0;

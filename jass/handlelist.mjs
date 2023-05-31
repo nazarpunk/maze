@@ -41,10 +41,16 @@ export const HandleListGetCount = (whichHandleList) => whichHandleList.size
  */
 export const HandleListGetHandleByIndex = (whichHandleList, index) => [...whichHandleList][index];
 
+/**
+ * native HandleListClear takes handlelist whichHandleList returns nothing
+ * @param {Set<BigInt>} handlelist
+ */
+export const HandleListClear = (handlelist) => handlelist.clear();
+
 /*
 native HandleListDestroy takes handlelist whichHandleList returns nothing
 native HandleListAddList takes handlelist destHandleList, handlelist sourceHandleList returns integer
 native HandleListRemoveList takes handlelist destHandleList, handlelist sourceHandleList returns integer
-native HandleListClear takes handlelist whichHandleList returns nothing
+
 native HandleListGetCountEx takes handlelist whichHandleList, integer handleTypeId returns integer
  */
