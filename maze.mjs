@@ -9,11 +9,9 @@ import {
     HandleListCreate, HandleListGetCount, HandleListGetHandleByIndex,
     HandleListRemoveHandle
 } from "./jass/handlelist.mjs";
-import {RandomSeed} from "./RandomSeed.mjs";
 
 const htOffset = 100n;
 const ht = InitHashtable();
-const cellCountKey = 0n;
 const widthKey = 1n;
 const heightKey = 2n;
 
@@ -29,7 +27,7 @@ const wallKeyB = BitwiseShiftLeft(1n, 3n);
 const wrap = document.querySelector('.maze');
 /** @type {HTMLDivElement[]} */ const domlist = [];
 
-/** @type {RandomSeed} */ let random;
+let seedC, seedM, seedX;
 
 /**
  * @param {BigInt} maze
@@ -49,13 +47,47 @@ const cellRedraw = (maze, index) => {
 
 /**
  * @param {BigInt} maze
+ * @return {BigInt}
+ */
+function MazeWidth(maze) {
+    return LoadInteger(ht, maze, widthKey);
+}
+
+/**
+ * @param {BigInt} maze
+ * @param {BigInt} index
+ * @return {BigInt}
+ */
+function MazeCellY(maze, index) {
+    return BigInt(Math.trunc(Number(index / MazeWidth(maze))));
+}
+
+/**
+ * @param {BigInt} maze
+ * @return {BigInt}
+ */
+function MazeHeight(maze) {
+    return LoadInteger(ht, maze, heightKey);
+}
+
+/**
+ * @param {BigInt} maze
+ * @param {BigInt} index
+ * @return {BigInt}
+ */
+function MazeCellX(maze, index) {
+    return index % MazeWidth(maze);
+}
+
+/**
+ * @param {BigInt} maze
  * @param {BigInt} index
  * @param {BigInt} l
  * @param {BigInt} t
  * @param {BigInt} r
  * @param {BigInt} b
  */
-export const MazeCellSetWallLTRB = (maze, index, l, t, r, b) => {
+function cellSetWallLTRB(maze, index, l, t, r, b) {
     const x = MazeCellX(maze, index);
     const y = MazeCellY(maze, index);
     const c = LoadInteger(ht, maze, htOffset + index);
@@ -67,8 +99,8 @@ export const MazeCellSetWallLTRB = (maze, index, l, t, r, b) => {
 
     if (l === 0n && x === 0n) l = 1n;
     if (t === 0n && y === 0n) t = 1n;
-    if (r === 0n && x === MazeGetWidth(maze) - 1n) r = 1n;
-    if (b === 0n && y === MazeGetHeight(maze) - 1n) b = 1n;
+    if (r === 0n && x === MazeWidth(maze) - 1n) r = 1n;
+    if (b === 0n && y === MazeHeight(maze) - 1n) b = 1n;
 
     let out = 0n;
     if (l > 0n) out += wallKeyL;
@@ -79,14 +111,14 @@ export const MazeCellSetWallLTRB = (maze, index, l, t, r, b) => {
     SaveInteger(ht, maze, htOffset + index, out);
 
     cellRedraw(maze, index);
-};
+}
 
 /**
  * @param {BigInt} maze
  * @param {BigInt} index
  * @return {number}
  */
-export const MazeCellWallCount = (maze, index) => {
+function cellGetWallCount(maze, index) {
     const c = LoadInteger(ht, maze, htOffset + index);
     let count = 0;
 
@@ -101,10 +133,10 @@ export const MazeCellWallCount = (maze, index) => {
 /**
  * @param {BigInt} maze
  * @param {BigInt} index
- * @param {boolean} contain
+ * @param {boolean} isAdd
  */
-const sideListSet = (maze, index, contain) => {
-    if (contain) {
+function sideListSet(maze, index, isAdd) {
+    if (isAdd) {
         if (!HandleListContainsHandle(sideList, index)) HandleListAddHandle(sideList, index);
     } else {
         HandleListRemoveHandle(sideList, index);
@@ -114,17 +146,27 @@ const sideListSet = (maze, index, contain) => {
 
 /**
  * @param {BigInt} maze
+ * @param {BigInt} x
+ * @param {BigInt} y
+ * @return {BigInt}
+ */
+const MazeCellGetByXY = (maze, x, y) => {
+    return x + MazeWidth(maze) * y;
+}
+
+/**
+ * @param {BigInt} maze
  * @param {BigInt} side
  * @param {BigInt} a
  * @param {BigInt} x
  * @param {BigInt} y
  */
-const randomCellAdd = (maze, side, a, x, y) => {
-    const b = MazeGetCellByXY(maze, x, y);
+function cellNextRandomAdd(maze, side, a, x, y) {
+    const b = MazeCellGetByXY(maze, x, y);
     const av = LoadInteger(ht, maze, htOffset + a);
     const bv = LoadInteger(ht, maze, htOffset + b);
 
-    sideListSet(maze, b, MazeCellWallCount(maze, b) === 4);
+    sideListSet(maze, b, cellGetWallCount(maze, b) === 4);
 
     if (side === wallKeyL && (BitwiseAND(av, wallKeyL) === 0n || BitwiseAND(bv, wallKeyR) === 0n)) return;
     if (side === wallKeyT && (BitwiseAND(av, wallKeyT) === 0n || BitwiseAND(bv, wallKeyB) === 0n)) return;
@@ -140,7 +182,7 @@ const randomCellAdd = (maze, side, a, x, y) => {
  * @param {BigInt} index
  * @return {Promise<BigInt>}
  */
-const randomCell = async (maze, index) => {
+async function cellNextRandom(maze, index) {
     let wc;
     const x = MazeCellX(maze, index);
     const y = MazeCellY(maze, index);
@@ -154,37 +196,74 @@ const randomCell = async (maze, index) => {
     // 6 : filter cell count
     // 7-10 : filter cells
 
-    if (x > 0n) /*                   */ randomCellAdd(maze, wallKeyL, index, x - 1n, y);
-    if (x < MazeGetWidth(maze) - 1n) /* */ randomCellAdd(maze, wallKeyR, index, x + 1n, y);
-    if (y > 0n) /*                   */ randomCellAdd(maze, wallKeyT, index, x, y - 1n);
-    if (y < MazeGetHeight(maze) - 1n) /**/ randomCellAdd(maze, wallKeyB, index, x, y + 1n);
+    if (x > 0n) cellNextRandomAdd(maze, wallKeyL, index, x - 1n, y);
+    if (y > 0n) cellNextRandomAdd(maze, wallKeyT, index, x, y - 1n);
+    if (x < MazeWidth(maze) - 1n) cellNextRandomAdd(maze, wallKeyR, index, x + 1n, y);
+    if (y < MazeHeight(maze) - 1n) cellNextRandomAdd(maze, wallKeyB, index, x, y + 1n);
 
     if (randomCellList[0] < 1n) return -1n;
 
     // max wall count
     randomCellList[5] = 0n;
     for (let i = 1n; i <= randomCellList[0]; i++) {
-        wc = MazeCellWallCount(maze, randomCellList[i]);
+        wc = cellGetWallCount(maze, randomCellList[i]);
         if (wc > randomCellList[5]) randomCellList[5] = wc;
     }
 
     // filter
     randomCellList[6] = 6n;
     for (let i = 1n; i <= randomCellList[0]; i++) {
-        wc = MazeCellWallCount(maze, randomCellList[i]);
+        wc = cellGetWallCount(maze, randomCellList[i]);
         if (wc >= randomCellList[5]) {
             randomCellList[6] += 1n;
             randomCellList[randomCellList[6]] = randomCellList[i];
         }
     }
-
-    for (let i = 7n; i <= randomCellList[6]; i++) domlist[randomCellList[i]].classList.add('random');
-    //await delay(700);
-    //await delay(500);
     await sleep();
+    for (let i = 7n; i <= randomCellList[6]; i++) domlist[randomCellList[i]].classList.add('random');
+    await delay(100);
     for (let i = 7n; i <= randomCellList[6]; i++) domlist[randomCellList[i]].classList.remove('random');
 
-    return randomCellList[Number(random.uniformInt(7n, randomCellList[6]))];
+    return randomCellList[Number(random(7n, randomCellList[6]))];
+}
+
+/**
+ * @param {BigInt} maze
+ * @param {BigInt} a
+ * @param {BigInt} direction
+ * @param {BigInt} w
+ * @param {BigInt} h
+ * @param {BigInt} x
+ * @param {BigInt} y
+ * @return {BigInt}
+ */
+function cellMergeWallBig(maze, a, direction, w, h, x, y) {
+    let b;
+
+    if (direction === wallKeyL) {
+        if (x === 0n) return -1n;
+        b = LoadInteger(ht, maze, (x - 1n + w * y) + htOffset);
+        if (BitwiseAND(a, wallKeyL) > 0n && BitwiseAND(b, wallKeyR) > 0n) return 0n;
+        return -1n;
+    }
+    if (direction === wallKeyT) {
+        if (y === 0n) return -1n;
+        b = LoadInteger(ht, maze, (x + w * (y - 1n)) + htOffset);
+        if (BitwiseAND(a, wallKeyT) > 0n && BitwiseAND(b, wallKeyB) > 0n) return 0n;
+        return -1n;
+    }
+    if (direction === wallKeyR) {
+        if (x === w - 1n) return -1n;
+        b = LoadInteger(ht, maze, (x + 1n + w * y) + htOffset);
+        if (BitwiseAND(a, wallKeyR) > 0n && BitwiseAND(b, wallKeyL) > 0n) return 0n;
+        return -1n;
+    }
+    if (direction === wallKeyB) {
+        if (y === h - 1n) return -1n;
+        b = LoadInteger(ht, maze, (x + w * (y + 1n)) + htOffset);
+        if (BitwiseAND(a, wallKeyB) > 0n && BitwiseAND(b, wallKeyT) > 0n) return 0n;
+        return -1n;
+    }
 }
 
 /**
@@ -192,24 +271,56 @@ const randomCell = async (maze, index) => {
  * @param {BigInt} a
  * @param {BigInt} direction
  * @param {BigInt} b
+ * @param {boolean} bigOnly
  */
-const cellMergeWall = (maze, a, direction, b) => {
-    if (direction === wallKeyL) {
-        MazeCellSetWallLTRB(maze, a, 0n, 0n, -1n, 0n);
-        MazeCellSetWallLTRB(maze, b, -1n, -1n, 0n, -1n);
+function cellMergeWall(maze, a, direction, b, bigOnly) {
+    const ca = LoadInteger(ht, maze, htOffset + a);
+    const ax = MazeCellX(maze, a);
+    const ay = MazeCellY(maze, a);
+    const w = MazeWidth(maze);
+    const h = MazeHeight(maze);
+
+    let al = -1n, at = -1n, ar = -1n, ab = -1n;
+    let bl = -1n, bt = -1n, br = -1n, bb = -1n;
+
+    if (direction === wallKeyL || direction === wallKeyR) {
+        if (bigOnly) {
+            at = cellMergeWallBig(maze, ca, wallKeyT, w, h, ax, ay);
+            ab = cellMergeWallBig(maze, ca, wallKeyB, w, h, ax, ay);
+        } else {
+            at = 0n;
+            ab = 0n;
+        }
+        if (direction === wallKeyL) {
+            al = 0n;
+            br = 0n;
+        }
+        if (direction === wallKeyR) {
+            ar = 0n;
+            bl = 0n;
+        }
     }
-    if (direction === wallKeyT) {
-        MazeCellSetWallLTRB(maze, a, 0n, 0n, 0n, -1n);
-        MazeCellSetWallLTRB(maze, b, -1n, -1n, -1n, 0n);
+
+    if (direction === wallKeyT || direction === wallKeyB) {
+        if (bigOnly) {
+            al = cellMergeWallBig(maze, ca, wallKeyL, w, h, ax, ay);
+            ar = cellMergeWallBig(maze, ca, wallKeyR, w, h, ax, ay);
+        } else {
+            al = 0n;
+            ar = 0n;
+        }
+        if (direction === wallKeyT) {
+            at = 0n;
+            bb = 0n;
+        }
+        if (direction === wallKeyB) {
+            ab = 0n;
+            bt = 0n;
+        }
     }
-    if (direction === wallKeyR) {
-        MazeCellSetWallLTRB(maze, a, -1n, 0n, 0n, 0n);
-        MazeCellSetWallLTRB(maze, b, 0n, -1n, -1n, -1n);
-    }
-    if (direction === wallKeyB) {
-        MazeCellSetWallLTRB(maze, a, 0n, -1n, 0n, 0n);
-        MazeCellSetWallLTRB(maze, b, -1n, 0n, -1n, -1n);
-    }
+
+    cellSetWallLTRB(maze, a, al, at, ar, ab);
+    cellSetWallLTRB(maze, b, bl, bt, br, bb);
 }
 
 /**
@@ -219,36 +330,50 @@ const cellMergeWall = (maze, a, direction, b) => {
  * @param {BigInt} x
  * @param {BigInt} y
  */
-const jumpCellSetWall = (maze, a, direction, x, y) => {
-    const b = MazeGetCellByXY(maze, x, y);
-    const wc = MazeCellWallCount(maze, b);
+function jumpCellSetWall(maze, a, direction, x, y) {
+    const b = MazeCellGetByXY(maze, x, y);
+    const wc = cellGetWallCount(maze, b);
 
     if (wc === 4) return false;
-    cellMergeWall(maze, a, direction, b);
+    cellMergeWall(maze, a, direction, b, false);
     return true;
+}
+
+/**
+ * @param {BigInt} min
+ * @param {BigInt} max
+ * @return {BigInt}
+ */
+function random(min, max) {
+    const mi = Number(min);
+    const ma = Number(max);
+
+    const t = 1103515245 * seedX + seedC;
+    seedX = t % seedM;
+    seedC = Math.floor(t / seedM);
+    return BigInt(Math.floor(seedX / 0x10000 * (ma - mi + 1)) + mi);
 }
 
 /**
  * @param {BigInt} maze
  * @param {BigInt} width
  * @param {BigInt} height
- * @param {BigInt} seed
+ * @param {number} seed
  * @param {BigInt} iterations
  * @return {Promise<void>}
  */
-export const MazeGenerate = async (maze, width, height, seed, iterations) => {
-    random = new RandomSeed(Number(seed));
+export async function MazeGenerate(maze, width, height, seed, iterations) {
+    seedC = 12345;
+    seedM = 0x10000;
+    seedX = seed;
 
-    if (iterations <= 0) iterations = width * height;
+    const count = width * height;
+    if (iterations <= 0) iterations = count;
 
-    const cellCount = width * height;
     let breakWall, wallJumped;
 
-    SaveInteger(ht, maze, cellCountKey, BigInt(cellCount));
     SaveInteger(ht, maze, widthKey, width);
     SaveInteger(ht, maze, heightKey, height);
-
-    const count = MazeGetCellCount(maze);
 
     HandleListClear(sideList);
 
@@ -256,8 +381,8 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
     domlist.length = 0;
 
     const px = '40px';
-    wrap.style.gridTemplateColumns = `repeat(${MazeGetWidth(maze)}, ${px})`;
-    wrap.style.gridTemplateRows = `repeat(${MazeGetHeight(maze)}, ${px})`;
+    wrap.style.gridTemplateColumns = `repeat(${MazeWidth(maze)}, ${px})`;
+    wrap.style.gridTemplateRows = `repeat(${MazeHeight(maze)}, ${px})`;
 
     for (let i = 0n; i < count; i++) {
         const cell = document.createElement('div');
@@ -273,7 +398,7 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
     for (let x = 0n; x < width; x++) {
         p.push((async () => {
             for (let y = 0n; y < height; y++) {
-                MazeCellSetWallLTRB(maze, MazeGetCellByXY(maze, x, x % 2n === 0n ? height - y - 1n : y), 1n, 1n, 1n, 1n);
+                cellSetWallLTRB(maze, MazeCellGetByXY(maze, x, x % 2n === 0n ? height - y - 1n : y), 1n, 1n, 1n, 1n);
                 await sleep();
             }
         })());
@@ -288,16 +413,16 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
     while (true) {
         breakWall = true;
         if (a < 0) {
-            ax = random.uniformInt(0n, width - 1n);
-            ay = random.uniformInt(0n, height - 1n);
-            a = MazeGetCellByXY(maze, ax, ay);
+            ax = random(0n, width - 1n);
+            ay = random(0n, height - 1n);
+            a = MazeCellGetByXY(maze, ax, ay);
         } else {
             ax = MazeCellX(maze, a);
             ay = MazeCellY(maze, a);
         }
         domlist[a].classList.add('active');
 
-        b = await randomCell(maze, a);
+        b = await cellNextRandom(maze, a);
         if (b < 0) {
             breakWall = false;
 
@@ -309,15 +434,14 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
                 b = HandleListGetHandleByIndex(sideList, i);
                 domlist[b].classList.add('random');
             }
-            await delay(200);
 
-            a = HandleListGetHandleByIndex(sideList, Number(random.uniformInt(0n, BigInt(sideListCount - 1))));
+            a = HandleListGetHandleByIndex(sideList, Number(random(0n, BigInt(sideListCount - 1))));
             ax = MazeCellX(maze, a);
             ay = MazeCellY(maze, a);
 
             domlist[a].classList.add('active');
 
-            await delay(200);
+            await delay(100);
 
             for (let i = 0; i < sideListCount; i++) {
                 b = HandleListGetHandleByIndex(sideList, i);
@@ -327,20 +451,22 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
             wallJumped = false;
             if (!wallJumped && ax > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyL, ax - 1n, ay);
             if (!wallJumped && ay > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyT, ax, ay - 1n);
-            if (!wallJumped && ax < MazeGetWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyR, ax + 1n, ay);
-            if (!wallJumped && ay < MazeGetHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyB, ax, ay + 1n);
+            if (!wallJumped && ax < MazeWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyR, ax + 1n, ay);
+            if (!wallJumped && ay < MazeHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyB, ax, ay + 1n);
             iterations--;
         }
 
         if (breakWall) {
             bx = MazeCellX(maze, b);
             by = MazeCellY(maze, b);
-            if (MazeCellWallCount(maze, b) === 4) iterations--;
+            if (cellGetWallCount(maze, b) === 4) iterations--;
 
-            if (ax > bx && ay === by) cellMergeWall(maze, a, wallKeyL, b);
-            if (ax === bx && ay > by) cellMergeWall(maze, a, wallKeyT, b);
-            if (ax < bx && ay === by) cellMergeWall(maze, a, wallKeyR, b);
-            if (ax === bx && ay < by) cellMergeWall(maze, a, wallKeyB, b);
+            const bb = true;
+
+            if (ax > bx && ay === by) cellMergeWall(maze, a, wallKeyL, b, bb);
+            if (ax === bx && ay > by) cellMergeWall(maze, a, wallKeyT, b, bb);
+            if (ax < bx && ay === by) cellMergeWall(maze, a, wallKeyR, b, bb);
+            if (ax === bx && ay < by) cellMergeWall(maze, a, wallKeyB, b, bb);
 
             domlist[a].classList.remove('active');
             a = b;
@@ -350,57 +476,4 @@ export const MazeGenerate = async (maze, width, height, seed, iterations) => {
         domlist[a].classList.remove('active');
         if (iterations === 1n) break;
     }
-}
-
-
-/**
- * @param {BigInt} maze
- * @param {BigInt} x
- * @param {BigInt} y
- * @return {BigInt}
- */
-export const MazeGetCellByXY = (maze, x, y) => {
-    return x + MazeGetWidth(maze) * y;
-}
-
-/**
- * @param {BigInt} maze
- * @param {BigInt} index
- * @return {BigInt}
- */
-export const MazeCellX = (maze, index) => {
-    return index % MazeGetWidth(maze);
-}
-
-/**
- * @param {BigInt} maze
- * @param {BigInt} index
- * @return {BigInt}
- */
-export const MazeCellY = (maze, index) => {
-    return BigInt(Math.trunc(Number(index / MazeGetWidth(maze))));
-}
-
-/**
- * @param {BigInt} maze
- * @return {BigInt}
- */
-export const MazeGetCellCount = (maze) => {
-    return LoadInteger(ht, maze, cellCountKey);
-}
-
-/**
- * @param {BigInt} maze
- * @return {BigInt}
- */
-export const MazeGetWidth = (maze) => {
-    return LoadInteger(ht, maze, widthKey);
-}
-
-/**
- * @param {BigInt} maze
- * @return {BigInt}
- */
-export const MazeGetHeight = (maze) => {
-    return LoadInteger(ht, maze, heightKey);
 }

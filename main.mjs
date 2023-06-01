@@ -27,18 +27,18 @@ form.addEventListener('submit', async e => {
     let w = Math.max(1, getV('width'));
     let h = Math.max(1, getV('height'));
     let s = getV('seed');
-    let c = getV('iterations');
+    let i = getV('iterations');
     const mc = w * h;
-    if (c > 0 && c > mc) c = mc;
+    if (i > 0 && i > mc) i = mc;
 
     setV('width', w);
     setV('height', h);
     setV('seed', s);
-    setV('iterations', c);
+    setV('iterations', i);
 
     location.hash = new URLSearchParams(new FormData(form)).toString();
 
     fieldset.disabled = true;
-    await MazeGenerate(11n, BigInt(w), BigInt(h), BigInt(s), BigInt(c));
+    await MazeGenerate(11n, BigInt(w), BigInt(h), s, BigInt(i));
     fieldset.disabled = false;
 })
