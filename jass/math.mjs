@@ -14,9 +14,28 @@ export const BitwiseShiftLeft = (bit, bitsToShift) => bit << bitsToShift;
  */
 export const BitwiseAND = (bit1, bit2) => bit1 & bit2
 
+/**
+ * native BitwiseGetBit takes integer bit, integer bitIndex returns integer
+ * @param {BigInt} bit
+ * @param {BigInt} bitIndex
+ * @return {BigInt}
+ */
+export const BitwiseGetBit = (bit, bitIndex) => (bit & 1n << bitIndex) !== 0n ? 1n : 0n
 
+/**
+ * native BitwiseSetBit takes integer i, integer bitIndex, integer bitValue returns integer
+ * @param {BigInt} i
+ * @param {BigInt} bitIndex
+ * @param {BigInt} bitValue
+ * @return {BigInt}
+ */
+export const BitwiseSetBit = (i, bitIndex, bitValue) => {
+    const mask = 1n << bitIndex;
+    return bitValue === 0n ? i & ~mask : i | mask;
+}
 
 /*
+
 native MathRound takes real r returns integer
 
 native MathRealRound takes real r returns real

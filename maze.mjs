@@ -2,7 +2,7 @@
 
 import {delay, sleep} from "./utils.mjs";
 import {InitHashtable, LoadInteger, SaveInteger} from "./jass/hashtable.mjs";
-import {BitwiseAND, BitwiseShiftLeft} from "./jass/math.mjs";
+import {BitwiseGetBit, BitwiseSetBit} from "./jass/math.mjs";
 import {
     HandleListAddHandle, HandleListClear,
     HandleListContainsHandle,
@@ -19,15 +19,30 @@ const heightKey = 2n;
 
 const sideList = HandleListCreate();
 
-const wallKeyL = BitwiseShiftLeft(1n, 0n);
-const wallKeyT = BitwiseShiftLeft(1n, 1n);
-const wallKeyR = BitwiseShiftLeft(1n, 2n);
-const wallKeyB = BitwiseShiftLeft(1n, 3n);
+let seedC, seedM, seedX;
+
+/**
+ * @param {BigInt} min
+ * @param {BigInt} max
+ * @return {BigInt}
+ */
+function random(min, max) {
+    const mi = Number(min);
+    const ma = Number(max);
+
+    const t = 1103515245 * seedX + seedC;
+    seedX = t % seedM;
+    seedC = Math.floor(t / seedM);
+    return BigInt(Math.floor(seedX / 0x10000 * (ma - mi + 1)) + mi);
+}
+
+const wL = 0n;
+const wT = 1n;
+const wR = 2n;
+const wB = 3n;
 
 const wrap = document.querySelector('.maze');
 /** @type {HTMLDivElement[]} */ const domlist = [];
-
-let seedC, seedM, seedX;
 
 /**
  * @param {BigInt} maze
@@ -37,10 +52,10 @@ const cellRedraw = (maze, index) => {
     const c = domlist[index].classList;
     const b = LoadInteger(ht, maze, htOffset + index);
 
-    c.toggle('wl', BitwiseAND(b, wallKeyL) > 0n);
-    c.toggle('wt', BitwiseAND(b, wallKeyT) > 0n);
-    c.toggle('wr', BitwiseAND(b, wallKeyR) > 0n);
-    c.toggle('wb', BitwiseAND(b, wallKeyB) > 0n);
+    c.toggle('wl', BitwiseGetBit(b, wL) !== 0n);
+    c.toggle('wt', BitwiseGetBit(b, wT) !== 0n);
+    c.toggle('wr', BitwiseGetBit(b, wR) !== 0n);
+    c.toggle('wb', BitwiseGetBit(b, wB) !== 0n);
 
     c.toggle('side', HandleListContainsHandle(sideList, index));
 }
@@ -51,15 +66,6 @@ const cellRedraw = (maze, index) => {
  */
 function MazeWidth(maze) {
     return LoadInteger(ht, maze, widthKey);
-}
-
-/**
- * @param {BigInt} maze
- * @param {BigInt} index
- * @return {BigInt}
- */
-function MazeCellY(maze, index) {
-    return BigInt(Math.trunc(Number(index / MazeWidth(maze))));
 }
 
 /**
@@ -75,6 +81,15 @@ function MazeHeight(maze) {
  * @param {BigInt} index
  * @return {BigInt}
  */
+function MazeCellY(maze, index) {
+    return BigInt(Math.trunc(Number(index / MazeWidth(maze))));
+}
+
+/**
+ * @param {BigInt} maze
+ * @param {BigInt} index
+ * @return {BigInt}
+ */
 function MazeCellX(maze, index) {
     return index % MazeWidth(maze);
 }
@@ -82,35 +97,24 @@ function MazeCellX(maze, index) {
 /**
  * @param {BigInt} maze
  * @param {BigInt} index
- * @param {BigInt} l
- * @param {BigInt} t
- * @param {BigInt} r
- * @param {BigInt} b
+ * @param {BigInt} direction
+ * @param {BigInt} value
  */
-function cellSetWallLTRB(maze, index, l, t, r, b) {
-    const x = MazeCellX(maze, index);
-    const y = MazeCellY(maze, index);
-    const c = LoadInteger(ht, maze, htOffset + index);
+function cellSetWall(maze, index, direction, value) {
+    let x, y, c;
+    if (value < 0n) return;
+    c = LoadInteger(ht, maze, htOffset + index);
+    if (value === 0n) {
+        x = MazeCellX(maze, index);
+        y = MazeCellY(maze, index);
+        if (direction === wL && x === 0n) return;
+        if (direction === wT && y === 0n) return;
+        if (direction === wR && x === MazeWidth(maze) - 1n) return;
+        if (direction === wB && y === MazeHeight(maze) - 1n) return;
+    }
 
-    if (l < 0) l = BitwiseAND(c, wallKeyL);
-    if (t < 0) t = BitwiseAND(c, wallKeyT);
-    if (r < 0) r = BitwiseAND(c, wallKeyR);
-    if (b < 0) b = BitwiseAND(c, wallKeyB);
-
-    if (l === 0n && x === 0n) l = 1n;
-    if (t === 0n && y === 0n) t = 1n;
-    if (r === 0n && x === MazeWidth(maze) - 1n) r = 1n;
-    if (b === 0n && y === MazeHeight(maze) - 1n) b = 1n;
-
-    let out = 0n;
-    if (l > 0n) out += wallKeyL;
-    if (t > 0n) out += wallKeyT;
-    if (r > 0n) out += wallKeyR;
-    if (b > 0n) out += wallKeyB;
-
-    SaveInteger(ht, maze, htOffset + index, out);
-
-    cellRedraw(maze, index);
+    c = BitwiseSetBit(c, direction, value);
+    SaveInteger(ht, maze, htOffset + index, c);
 }
 
 /**
@@ -122,10 +126,10 @@ function cellGetWallCount(maze, index) {
     const c = LoadInteger(ht, maze, htOffset + index);
     let count = 0;
 
-    if (BitwiseAND(c, wallKeyL) > 0n) count += 1;
-    if (BitwiseAND(c, wallKeyT) > 0n) count += 1;
-    if (BitwiseAND(c, wallKeyR) > 0n) count += 1;
-    if (BitwiseAND(c, wallKeyB) > 0n) count += 1;
+    if (BitwiseGetBit(c, wL) !== 0n) count += 1;
+    if (BitwiseGetBit(c, wT) !== 0n) count += 1;
+    if (BitwiseGetBit(c, wR) !== 0n) count += 1;
+    if (BitwiseGetBit(c, wB) !== 0n) count += 1;
 
     return count;
 }
@@ -168,10 +172,10 @@ function cellNextRandomAdd(maze, side, a, x, y) {
 
     sideListSet(maze, b, cellGetWallCount(maze, b) === 4);
 
-    if (side === wallKeyL && (BitwiseAND(av, wallKeyL) === 0n || BitwiseAND(bv, wallKeyR) === 0n)) return;
-    if (side === wallKeyT && (BitwiseAND(av, wallKeyT) === 0n || BitwiseAND(bv, wallKeyB) === 0n)) return;
-    if (side === wallKeyR && (BitwiseAND(av, wallKeyR) === 0n || BitwiseAND(bv, wallKeyL) === 0n)) return;
-    if (side === wallKeyB && (BitwiseAND(av, wallKeyB) === 0n || BitwiseAND(bv, wallKeyT) === 0n)) return;
+    if (side === wL && (BitwiseGetBit(av, wL) === 0n || BitwiseGetBit(bv, wR) === 0n)) return;
+    if (side === wT && (BitwiseGetBit(av, wT) === 0n || BitwiseGetBit(bv, wB) === 0n)) return;
+    if (side === wR && (BitwiseGetBit(av, wR) === 0n || BitwiseGetBit(bv, wL) === 0n)) return;
+    if (side === wB && (BitwiseGetBit(av, wB) === 0n || BitwiseGetBit(bv, wT) === 0n)) return;
 
     randomCellList[0] += 1n;
     randomCellList[randomCellList[0]] = b;
@@ -196,10 +200,10 @@ async function cellNextRandom(maze, index) {
     // 6 : filter cell count
     // 7-10 : filter cells
 
-    if (x > 0n) cellNextRandomAdd(maze, wallKeyL, index, x - 1n, y);
-    if (y > 0n) cellNextRandomAdd(maze, wallKeyT, index, x, y - 1n);
-    if (x < MazeWidth(maze) - 1n) cellNextRandomAdd(maze, wallKeyR, index, x + 1n, y);
-    if (y < MazeHeight(maze) - 1n) cellNextRandomAdd(maze, wallKeyB, index, x, y + 1n);
+    if (x > 0n) cellNextRandomAdd(maze, wL, index, x - 1n, y);
+    if (y > 0n) cellNextRandomAdd(maze, wT, index, x, y - 1n);
+    if (x < MazeWidth(maze) - 1n) cellNextRandomAdd(maze, wR, index, x + 1n, y);
+    if (y < MazeHeight(maze) - 1n) cellNextRandomAdd(maze, wB, index, x, y + 1n);
 
     if (randomCellList[0] < 1n) return -1n;
 
@@ -229,98 +233,66 @@ async function cellNextRandom(maze, index) {
 
 /**
  * @param {BigInt} maze
- * @param {BigInt} a
+ * @param {BigInt} ai
  * @param {BigInt} direction
- * @param {BigInt} w
- * @param {BigInt} h
- * @param {BigInt} x
- * @param {BigInt} y
- * @return {BigInt}
- */
-function cellMergeWallBig(maze, a, direction, w, h, x, y) {
-    let b;
-
-    if (direction === wallKeyL) {
-        if (x === 0n) return -1n;
-        b = LoadInteger(ht, maze, (x - 1n + w * y) + htOffset);
-        if (BitwiseAND(a, wallKeyL) > 0n && BitwiseAND(b, wallKeyR) > 0n) return 0n;
-        return -1n;
-    }
-    if (direction === wallKeyT) {
-        if (y === 0n) return -1n;
-        b = LoadInteger(ht, maze, (x + w * (y - 1n)) + htOffset);
-        if (BitwiseAND(a, wallKeyT) > 0n && BitwiseAND(b, wallKeyB) > 0n) return 0n;
-        return -1n;
-    }
-    if (direction === wallKeyR) {
-        if (x === w - 1n) return -1n;
-        b = LoadInteger(ht, maze, (x + 1n + w * y) + htOffset);
-        if (BitwiseAND(a, wallKeyR) > 0n && BitwiseAND(b, wallKeyL) > 0n) return 0n;
-        return -1n;
-    }
-    if (direction === wallKeyB) {
-        if (y === h - 1n) return -1n;
-        b = LoadInteger(ht, maze, (x + w * (y + 1n)) + htOffset);
-        if (BitwiseAND(a, wallKeyB) > 0n && BitwiseAND(b, wallKeyT) > 0n) return 0n;
-        return -1n;
-    }
-}
-
-/**
- * @param {BigInt} maze
- * @param {BigInt} a
- * @param {BigInt} direction
- * @param {BigInt} b
+ * @param {BigInt} bi
  * @param {boolean} bigOnly
  */
-function cellMergeWall(maze, a, direction, b, bigOnly) {
-    const ca = LoadInteger(ht, maze, htOffset + a);
-    const ax = MazeCellX(maze, a);
-    const ay = MazeCellY(maze, a);
+function cellMergeWall(maze, ai, direction, bi, bigOnly) {
+    const av = LoadInteger(ht, maze, htOffset + ai);
+    const ax = MazeCellX(maze, ai);
+    const ay = MazeCellY(maze, ai);
     const w = MazeWidth(maze);
     const h = MazeHeight(maze);
+    let bv;
 
-    let al = -1n, at = -1n, ar = -1n, ab = -1n;
-    let bl = -1n, bt = -1n, br = -1n, bb = -1n;
-
-    if (direction === wallKeyL || direction === wallKeyR) {
+    if (direction === wL || direction === wR) {
         if (bigOnly) {
-            at = cellMergeWallBig(maze, ca, wallKeyT, w, h, ax, ay);
-            ab = cellMergeWallBig(maze, ca, wallKeyB, w, h, ax, ay);
+            if (ay > 0n) {
+                bv = LoadInteger(ht, maze, (ax + w * (ay - 1n)) + htOffset);
+                if (BitwiseGetBit(av, wT) === 1n && BitwiseGetBit(bv, wB) === 1n) cellSetWall(maze, ai, wT, 0n);
+            }
+            if (ay < h - 1n) {
+                bv = LoadInteger(ht, maze, (ax + w * (ay + 1n)) + htOffset);
+                if (BitwiseGetBit(av, wB) === 1n && BitwiseGetBit(bv, wT) === 1n) cellSetWall(maze, ai, wB, 0n);
+            }
         } else {
-            at = 0n;
-            ab = 0n;
+            cellSetWall(maze, ai, wT, 0n);
+            cellSetWall(maze, ai, wB, 0n);
         }
-        if (direction === wallKeyL) {
-            al = 0n;
-            br = 0n;
+        if (direction === wL) {
+            cellSetWall(maze, ai, wL, 0n);
+            cellSetWall(maze, bi, wR, 0n);
         }
-        if (direction === wallKeyR) {
-            ar = 0n;
-            bl = 0n;
+        if (direction === wR) {
+            cellSetWall(maze, ai, wR, 0n);
+            cellSetWall(maze, bi, wL, 0n);
         }
     }
 
-    if (direction === wallKeyT || direction === wallKeyB) {
+    if (direction === wT || direction === wB) {
         if (bigOnly) {
-            al = cellMergeWallBig(maze, ca, wallKeyL, w, h, ax, ay);
-            ar = cellMergeWallBig(maze, ca, wallKeyR, w, h, ax, ay);
+            if (ax > 0n) {
+                bv = LoadInteger(ht, maze, (ax - 1n + w * ay) + htOffset);
+                if (BitwiseGetBit(av, wL) === 1n && BitwiseGetBit(bv, wR) === 1n) cellSetWall(maze, ai, wL, 0n);
+            }
+            if (ax < w - 1n) {
+                bv = LoadInteger(ht, maze, (ax + 1n + w * ay) + htOffset);
+                if (BitwiseGetBit(av, wR) === 1n && BitwiseGetBit(bv, wL) === 1n) cellSetWall(maze, ai, wR, 0n);
+            }
         } else {
-            al = 0n;
-            ar = 0n;
+            cellSetWall(maze, ai, wL, 0n);
+            cellSetWall(maze, ai, wR, 0n);
         }
-        if (direction === wallKeyT) {
-            at = 0n;
-            bb = 0n;
+        if (direction === wT) {
+            cellSetWall(maze, ai, wT, 0n);
+            cellSetWall(maze, bi, wB, 0n);
         }
-        if (direction === wallKeyB) {
-            ab = 0n;
-            bt = 0n;
+        if (direction === wB) {
+            cellSetWall(maze, ai, wB, 0n);
+            cellSetWall(maze, bi, wT, 0n);
         }
     }
-
-    cellSetWallLTRB(maze, a, al, at, ar, ab);
-    cellSetWallLTRB(maze, b, bl, bt, br, bb);
 }
 
 /**
@@ -340,21 +312,6 @@ function jumpCellSetWall(maze, a, direction, x, y) {
 }
 
 /**
- * @param {BigInt} min
- * @param {BigInt} max
- * @return {BigInt}
- */
-function random(min, max) {
-    const mi = Number(min);
-    const ma = Number(max);
-
-    const t = 1103515245 * seedX + seedC;
-    seedX = t % seedM;
-    seedC = Math.floor(t / seedM);
-    return BigInt(Math.floor(seedX / 0x10000 * (ma - mi + 1)) + mi);
-}
-
-/**
  * @param {BigInt} maze
  * @param {BigInt} width
  * @param {BigInt} height
@@ -368,7 +325,7 @@ export async function MazeGenerate(maze, width, height, seed, iterations) {
     seedX = seed;
 
     const count = width * height;
-    if (iterations <= 0) iterations = count;
+    if (iterations <= 0) iterations = count + 1n;
 
     let breakWall, wallJumped;
 
@@ -398,7 +355,9 @@ export async function MazeGenerate(maze, width, height, seed, iterations) {
     for (let x = 0n; x < width; x++) {
         p.push((async () => {
             for (let y = 0n; y < height; y++) {
-                cellSetWallLTRB(maze, MazeCellGetByXY(maze, x, x % 2n === 0n ? height - y - 1n : y), 1n, 1n, 1n, 1n);
+                const index = MazeCellGetByXY(maze, x, x % 2n === 0n ? height - y - 1n : y);
+                SaveInteger(ht, maze, htOffset + index, 15n);
+                cellRedraw(maze, index);
                 await sleep();
             }
         })());
@@ -449,10 +408,10 @@ export async function MazeGenerate(maze, width, height, seed, iterations) {
             }
 
             wallJumped = false;
-            if (!wallJumped && ax > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyL, ax - 1n, ay);
-            if (!wallJumped && ay > 0n) wallJumped = jumpCellSetWall(maze, a, wallKeyT, ax, ay - 1n);
-            if (!wallJumped && ax < MazeWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyR, ax + 1n, ay);
-            if (!wallJumped && ay < MazeHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wallKeyB, ax, ay + 1n);
+            if (!wallJumped && ax > 0n) wallJumped = jumpCellSetWall(maze, a, wL, ax - 1n, ay);
+            if (!wallJumped && ay > 0n) wallJumped = jumpCellSetWall(maze, a, wT, ax, ay - 1n);
+            if (!wallJumped && ax < MazeWidth(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wR, ax + 1n, ay);
+            if (!wallJumped && ay < MazeHeight(maze) - 1n) wallJumped = jumpCellSetWall(maze, a, wB, ax, ay + 1n);
             iterations--;
         }
 
@@ -461,12 +420,10 @@ export async function MazeGenerate(maze, width, height, seed, iterations) {
             by = MazeCellY(maze, b);
             if (cellGetWallCount(maze, b) === 4) iterations--;
 
-            const bb = true;
-
-            if (ax > bx && ay === by) cellMergeWall(maze, a, wallKeyL, b, bb);
-            if (ax === bx && ay > by) cellMergeWall(maze, a, wallKeyT, b, bb);
-            if (ax < bx && ay === by) cellMergeWall(maze, a, wallKeyR, b, bb);
-            if (ax === bx && ay < by) cellMergeWall(maze, a, wallKeyB, b, bb);
+            if (ax > bx && ay === by) cellMergeWall(maze, a, wL, b, true);
+            if (ax === bx && ay > by) cellMergeWall(maze, a, wT, b, true);
+            if (ax < bx && ay === by) cellMergeWall(maze, a, wR, b, true);
+            if (ax === bx && ay < by) cellMergeWall(maze, a, wB, b, true);
 
             domlist[a].classList.remove('active');
             a = b;
