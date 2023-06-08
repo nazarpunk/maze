@@ -1,6 +1,6 @@
 // noinspection JSCheckFunctionSignatures
 
-import {MazeGenerate} from "./maze.mjs";
+import {MazeGenerate} from "./maze/generate.mjs";
 
 const form = document.querySelector('form');
 const fieldset = form.querySelector('fieldset');
